@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+
+<html ng-app="gameApp">
+<head>
+  <meta charset="UTF-8">
+  <title></title>
+
+  <style>
+    body { margin: 0; }
+    canvas { display: block; }
+
+    @font-face {
+      font-family: "Roboto-Bold";
+      src: url("assets/fonts/Roboto-Bold.ttf");
+    }
+
+    @font-face {
+      font-family: "Spacesky";
+      src: url("assets/fonts/Spacesky.ttf");
+    }
+
+  </style>
+
+  <!-- Telegram SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+
+
+  <div style="font-family:Spacesky; position:absolute; left:-1000px; visibility:hidden;">.</div>
+ 	<div style="font-family:Roboto-Bold; position:absolute; left:-1000px; visibility:hidden;">.</div>
+
+  <!-- <p id="user"></p>
+  <button onclick="sendData()">Send Data</button> -->
+
+
+  <script type="text/javascript" src="./lib/phaser.min.js"></script>
+
+  <script type="text/javascript" src="./js/Objects/enemy-wave-data.js"></script>
+  <script type="text/javascript" src="./js/Objects/collisions.js"></script>
+  <script type="text/javascript" src="./js/Objects/button.js"></script>
+  <script type="text/javascript" src="./js/Objects/anim.js"></script>
+  <script type="text/javascript" src="./js/Objects/platform.js"></script>
+  <script type="text/javascript" src="./js/Objects/powerup.js"></script>
+
+  <script type="text/javascript" src="./js/Objects/player.js"></script>
+  <script type="text/javascript" src="./js/Objects/enemy.js"></script>
+  <script type="text/javascript" src="./js/Objects/boss-enemy.js"></script>
+  <script type="text/javascript" src="./js/Objects/bullet.js"></script>
+  <script type="text/javascript" src="./js/Objects/drag-controller.js"></script>
+
+  <script type="text/javascript" src="./js/Scenes/boot.js"></script>
+  <script type="text/javascript" src="./js/Scenes/preload.js"></script>
+  <script type="text/javascript" src="./js/Scenes/menu.js"></script>
+  <script type="text/javascript" src="./js/Scenes/game.js"></script>
+  <script type="text/javascript" src="./js/Scenes/result.js"></script>
+
+  <script type="text/javascript" src="./js/main.js"></script>
+
+  <script type="text/javascript">
+
+
+
+  </script>
+
+<script>
+let tg = null;
+
+if (window.Telegram && window.Telegram.WebApp) {
+  tg = window.Telegram.WebApp;
+} else {
+  console.log("Running outside Telegram (test mode)");
+
+  // Fake data for testing
+ window.Telegram = {
+  WebApp: {
+    initData: "user=%7B%22id%22%3A123456%2C%22first_name%22%3A%22Test%22%7D",
+
+    initDataUnsafe: {
+      user: {
+        id: 123456,
+        first_name: "Test"
+      }
+    },
+
+    expand: () => console.log("expand() called"),
+    openInvoice: () => console.log("openInvoice() called"),
+    onEvent: () => console.log("onEvent() called"),
+    sendData: () => console.log("sendData() called")
+  }
+};
+  tg = window.Telegram.WebApp;
+}
+
+// Expand UI
+tg.expand();
+
+// Global state
+let SESSION_TOKEN = null;
+let USER = null;
+let GAME_START_TIME = null;
+let isStartingSession = false;
+const API_URL = "https://vegan-talisman-mystified.ngrok-free.dev";
+
+/**
+ * 🚀 INIT APP
+ */
+async function initApp() {
+  try {
+    USER = tg.initDataUnsafe.user;
+
+    // store Telegram user_id for later
+    if (USER && USER.id) {
+      localStorage.setItem("user_id", USER.id);
+    }
+
+    // Try starting game session
+    await startGame();
+  } catch (err) {
+    console.error("Init error:", err);
+  }
+}
+
+
+/**
+ * 🎮 START GAME SESSION
+ */
+
+async function startGame() {
+  if (isStartingSession) return;
+  isStartingSession = true;
+
+  try {
+    const res = await fetch(API_URL+'/api/start-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ initData: tg.initData })
+    });
+    const data = await res.json();
+    console.log("START SESSION RESPONSE:", data);
+
+    if (data.action === "PAY") {
+      showPayButton(); // show the button to unlock
+      isStartingSession = false;
+      return;
+    }
+
+    if (!data.sessionToken) throw new Error("No session token received");
+
+    SESSION_TOKEN = data.sessionToken;
+    GAME_START_TIME = Date.now();
+
+    console.log("✅ Session started:", SESSION_TOKEN);
+
+    startPhaserGame();
+
+    isStartingSession = false;
+
+  } catch (err) {
+    console.error("Session error:", err);
+    isStartingSession = false;
+  }
+}
+
+// function showPayButton() {
+//   // Avoid duplicate button
+//   if (document.getElementById("unlock-btn")) return;
+
+//   const btn = document.createElement("button");
+//   btn.id = "unlock-btn";
+//   btn.innerText = "Unlock Play 🎮";
+//   btn.style.position = "absolute";
+//   btn.style.top = "50%";
+//   btn.style.left = "50%";
+//   btn.style.transform = "translate(-50%, -50%)";
+//   btn.style.padding = "1em 2em";
+//   btn.style.width = "80%";
+//   btn.style.height = "20%";
+//   btn.style.fontSize = "60px";
+//   btn.style.cursor = "pointer";
+
+//   btn.onclick = () => {
+//     const userId = localStorage.getItem("user_id");
+//     if (!userId) return alert("User ID not found!");
+//     window.open(`https://t.me/prevgamebot?start=unlock_${userId}`, "_blank");
+//   };
+
+//   document.body.appendChild(btn);
+// }
+
+
+function showPayButton() {
+  if (document.getElementById("unlock-btn")) return;
+
+  const btn = document.createElement("button");
+  btn.id = "unlock-btn";
+  btn.innerText = "🎮 Unlock Play";
+
+  // Container (optional overlay feel)
+  const wrapper = document.createElement("div");
+  wrapper.style.position = "fixed";
+  wrapper.style.top = "0";
+  wrapper.style.left = "0";
+  wrapper.style.width = "100%";
+  wrapper.style.height = "100%";
+  wrapper.style.display = "flex";
+  wrapper.style.alignItems = "center";
+  wrapper.style.justifyContent = "center";
+  wrapper.style.background = "rgba(0,0,0,0.4)";
+  wrapper.style.zIndex = "9999";
+
+  // Button styling (mobile-first)
+  btn.style.width = "85%";
+  btn.style.maxWidth = "400px";
+  btn.style.padding = "18px";
+  btn.style.fontSize = "20px";
+  btn.style.fontWeight = "600";
+  btn.style.borderRadius = "16px";
+  btn.style.border = "none";
+  btn.style.background = "linear-gradient(135deg, #4CAF50, #2E7D32)";
+  btn.style.color = "#fff";
+  btn.style.boxShadow = "0 8px 20px rgba(0,0,0,0.25)";
+  btn.style.cursor = "pointer";
+  btn.style.transition = "all 0.2s ease";
+
+  // Press effect
+  btn.onmousedown = () => {
+    btn.style.transform = "scale(0.97)";
+  };
+  btn.onmouseup = () => {
+    btn.style.transform = "scale(1)";
+  };
+
+  btn.onclick = async () => {
+    try {
+      const res = await fetch(API_URL + "/api/create-invoice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ initData: tg.initData })
+      });
+
+      const data = await res.json();
+
+      if (!data.invoice_link) {
+        alert("Failed to create invoice");
+        return;
+      }
+
+      tg.openInvoice(data.invoice_link);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  wrapper.appendChild(btn);
+  document.body.appendChild(wrapper);
+}
+
+tg.onEvent('invoiceClosed', async (event) => {
+    if (event.status === 'paid') {
+        console.log("Payment successful");
+
+        // 🔁 Retry session
+        const res = await fetch(API_URL + "/api/start-session", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ initData: Global.initData })
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+            Global.sessionToken = data.sessionToken;
+            game.scene.start('game'); // or this.scene.start
+        }
+    }
+});
+
+async function waitForUnlock() {
+  console.log("⏳ Waiting for payment...");
+
+  const userId = localStorage.getItem("user_id");
+
+  const interval = setInterval(async () => {
+    try {
+      const res = await fetch(API_URL+`/api/check-unlock/${userId}`);
+      const data = await res.json();
+
+      console.log("🔍 Checking unlock:", data);
+
+      if (data.unlocked) {
+        clearInterval(interval);
+
+        console.log("✅ Payment confirmed. Restarting game...");
+
+        // Remove button
+        const btn = document.getElementById("unlock-btn");
+        if (btn) btn.remove();
+
+        // Restart game
+        await startGame();
+      }
+    } catch (err) {
+      console.error("Check error:", err);
+    }
+  }, 3000); // check every 3 seconds
+}
+/**
+ * 💾 SUBMIT SCORE
+ */
+async function submitScore(score) {
+  try {
+    // 🚨 Prevent submit without session
+    if (!SESSION_TOKEN) {
+      console.error("No session token. Restarting...");
+      await startGame();
+      return;
+    }
+
+    
+    Global.initData = tg.initData;
+
+    const playTime = (Date.now() - GAME_START_TIME) / 1000;
+
+    const res = await fetch(API_URL+'/api/score', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        initData: tg.initData,
+        score: score,
+        sessionToken: SESSION_TOKEN,
+        playTime: playTime
+      })
+    });
+
+
+    const data = await res.json();
+
+    console.log("🎯 Score response:", data);
+
+    // 🔁 Reset session after submit (optional but safer)
+    SESSION_TOKEN = null;
+
+  } catch (err) {
+    console.error("Submit error:", err);
+  }
+}
+
+
+function startPhaserGame() {
+    console.log("🎮 Launching Phaser...");
+    init();  // Calls your existing init() function
+}
+
+/**
+ * 📤 OPTIONAL: Send data to bot
+ */
+function sendData() {
+  tg.sendData(JSON.stringify({
+    action: "clicked_button",
+    time: new Date().toISOString()
+  }));
+}
+
+let hasRetriedViewport = false;
+
+tg.onEvent('viewportChanged', async () => {
+    if (!SESSION_TOKEN && !hasRetriedViewport) {
+        hasRetriedViewport = true;
+        console.log("🔁 Retrying session after payment...");
+        await startGame();
+    }
+});
+
+
+async function canPlay() {
+  const userId = localStorage.getItem("user_id");
+
+  const res = await fetch(API_URL+`/api/check-unlock/${userId}`);
+  const data = await res.json();
+
+  if (!data.unlocked) {
+    showPayButton();
+    return false;
+  }
+
+  return true;
+}
+
+// Start everything
+
+  initApp();
+
+</script>
+</body>
+</html>

@@ -1,0 +1,44 @@
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables
+.env
+.env.test
+.env.production
+
+# Logs
+logs/
+*.log
+
+# Build / output
+dist/
+build/
+out/
+
+# Mac system files
+.DS_Store
+
+# IDE / Editor
+.vscode/
+.idea/
+
+# OS files
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Coverage
+coverage/
+
+# Database
+*.sqlite
+*.db
+
+# Misc
+*.swp
