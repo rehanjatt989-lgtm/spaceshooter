@@ -1,195 +1,108 @@
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+
 <script>
-let tg = null;
+let tg;
+let SESSION_TOKEN = null;
+let GAME_STARTED = false;
 
-/* ✅ TELEGRAM INIT (SAFE) */
-try {
-  if (window.Telegram && window.Telegram.WebApp) {
-    tg = window.Telegram.WebApp;
-  } else {
-    throw new Error();
-  }
-} catch {
-  console.log("Test mode");
+const API_URL = "https://spaceshooter-backend.onrender.com";
 
+/* ===============================
+   TELEGRAM OR BROWSER
+=============================== */
+if (window.Telegram && window.Telegram.WebApp) {
+  tg = window.Telegram.WebApp;
+  console.log("Telegram mode");
+} else {
+  console.log("Browser mode");
+
+  // fallback user (ONLY for browser testing)
   tg = {
     initData: "user=" + encodeURIComponent(JSON.stringify({
-      id: 123456,
-      first_name: "Test"
+      id: 99999,
+      username: "browser_user"
     })),
     initDataUnsafe: {
-      user: { id: 123456, first_name: "Test" }
+      user: { id: 99999, username: "browser_user" }
     },
-    expand: () => {},
-    openInvoice: () => {},
-    onEvent: () => {},
-    sendData: () => {}
+    expand: () => {}
   };
 }
 
-// Expand UI
-tg.expand();
-
-// Global state
-let SESSION_TOKEN = null;
-let USER = null;
-let GAME_START_TIME = null;
-let isStartingSession = false;
-const API_URL = "https://spaceshooter-backend.onrender.com";
-
-/**
- * 🚀 INIT APP
- */
-async function initApp() {
+/* ===============================
+   START APP
+=============================== */
+window.addEventListener("load", () => {
   try {
-    USER = tg.initDataUnsafe.user;
-
-    if (USER && USER.id) {
-      localStorage.setItem("user_id", USER.id);
+    if (tg && tg.expand) {
+      tg.expand();
     }
-
-    await startGame();
-  } catch (err) {
-    console.error("Init error:", err);
+  } catch (e) {
+    console.log("Expand skipped");
   }
-}
 
-/**
- * 🎮 START GAME SESSION
- */
-async function startGame() {
-  if (isStartingSession) return;
-  isStartingSession = true;
-
+  startSession();
+});
+/* ===============================
+   START SESSION (REQUIRED)
+=============================== */
+async function startSession() {
   try {
-    const res = await fetch(API_URL + '/api/start-session', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ initData: tg.initData })
+    console.log("Starting session...");
+
+    const res = await fetch(API_URL + "/api/start-session", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        initData: tg.initData
+      })
     });
 
     const data = await res.json();
-    console.log("START SESSION RESPONSE:", data);
+    console.log("Session response:", data);
 
-    if (data.action === "PAY") {
-      showPayButton();
-      isStartingSession = false;
+    if (!data.success || !data.sessionToken) {
+      alert("No plays available. Please purchase or try later.");
       return;
     }
 
-    if (!data.sessionToken) throw new Error("No session token received");
-
     SESSION_TOKEN = data.sessionToken;
-    GAME_START_TIME = Date.now();
 
-    console.log("✅ Session started:", SESSION_TOKEN);
-
-    startPhaserGame();
-
-    isStartingSession = false;
+    startGame();
 
   } catch (err) {
     console.error("Session error:", err);
-    isStartingSession = false;
+    alert("Server error. Try again.");
   }
 }
 
-/**
- * 💳 PAY BUTTON
- */
-function showPayButton() {
-  if (document.getElementById("unlock-btn")) return;
+/* ===============================
+   START GAME
+=============================== */
+function startGame() {
+  if (GAME_STARTED) return;
+  GAME_STARTED = true;
 
-  const btn = document.createElement("button");
-  btn.id = "unlock-btn";
-  btn.innerText = "🎮 Unlock Play";
-
-  const wrapper = document.createElement("div");
-  wrapper.style.position = "fixed";
-  wrapper.style.top = "0";
-  wrapper.style.left = "0";
-  wrapper.style.width = "100%";
-  wrapper.style.height = "100%";
-  wrapper.style.display = "flex";
-  wrapper.style.alignItems = "center";
-  wrapper.style.justifyContent = "center";
-  wrapper.style.background = "rgba(0,0,0,0.4)";
-  wrapper.style.zIndex = "9999";
-
-  btn.style.width = "85%";
-  btn.style.maxWidth = "400px";
-  btn.style.padding = "18px";
-  btn.style.fontSize = "20px";
-  btn.style.fontWeight = "600";
-  btn.style.borderRadius = "16px";
-  btn.style.border = "none";
-  btn.style.background = "linear-gradient(135deg, #4CAF50, #2E7D32)";
-  btn.style.color = "#fff";
-  btn.style.boxShadow = "0 8px 20px rgba(0,0,0,0.25)";
-  btn.style.cursor = "pointer";
-
-  btn.onclick = async () => {
-    try {
-      const res = await fetch(API_URL + "/api/create-invoice", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ initData: tg.initData })
-      });
-
-      const data = await res.json();
-
-      if (!data.invoice_link) {
-        alert("Failed to create invoice");
-        return;
-      }
-
-      tg.openInvoice(data.invoice_link);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  wrapper.appendChild(btn);
-  document.body.appendChild(wrapper);
+  console.log("Launching game...");
+  init(); // Phaser start
 }
 
-/* ✅ SAFE invoiceClosed */
-if (tg.onEvent) {
-  tg.onEvent('invoiceClosed', async (event) => {
-    if (event.status === 'paid') {
-      console.log("Payment successful");
-
-      const res = await fetch(API_URL + "/api/start-session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ initData: tg.initData })
-      });
-
-      const data = await res.json();
-
-      if (data.sessionToken) {
-        SESSION_TOKEN = data.sessionToken;
-        startPhaserGame();
-      }
-    }
-  });
-}
-
-/**
- * 💾 SUBMIT SCORE
- */
+/* ===============================
+   SUBMIT SCORE
+=============================== */
 async function submitScore(score) {
+  if (!SESSION_TOKEN) return;
+
   try {
-    if (!SESSION_TOKEN) {
-      console.error("No session token. Restarting...");
-      await startGame();
-      return;
-    }
+    const playTime = 60; // or your actual time
 
-    const playTime = (Date.now() - GAME_START_TIME) / 1000;
-
-    const res = await fetch(API_URL + '/api/score', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const res = await fetch(API_URL + "/api/score", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
       body: JSON.stringify({
         initData: tg.initData,
         score: score,
@@ -199,49 +112,10 @@ async function submitScore(score) {
     });
 
     const data = await res.json();
-    console.log("🎯 Score response:", data);
-
-    SESSION_TOKEN = null;
+    console.log("Score response:", data);
 
   } catch (err) {
-    console.error("Submit error:", err);
+    console.error("Score error:", err);
   }
 }
-
-/**
- * 🎮 START PHASER
- */
-function startPhaserGame() {
-  console.log("🎮 Launching Phaser...");
-  init();
-}
-
-/**
- * 📤 OPTIONAL
- */
-function sendData() {
-  tg.sendData(JSON.stringify({
-    action: "clicked_button",
-    time: new Date().toISOString()
-  }));
-}
-
-let hasRetriedViewport = false;
-
-/* ✅ FINAL FIX — FULL SAFE BLOCK */
-if (tg.onEvent) {
-  tg.onEvent('viewportChanged', async () => {
-    if (!SESSION_TOKEN && !hasRetriedViewport) {
-      hasRetriedViewport = true;
-      console.log("🔁 Retrying session...");
-      await startGame();
-    }
-  });
-}
-
-/**
- * 🚀 START APP
- */
-initApp();
-
 </script>
