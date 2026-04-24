@@ -5,7 +5,7 @@ var Global = {
   initData:null,
   rank:0,
   enemySpeed:300,
-  api_url: "https://vegan-talisman-mystified.ngrok-free.dev"
+  api_url: "https://spaceshooter-backend.onrender.com"
 };
 
 var config = {
