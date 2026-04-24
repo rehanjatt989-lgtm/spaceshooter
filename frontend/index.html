@@ -2,62 +2,46 @@
 
 <script>
 let tg;
-let USER = null;
-let isStartingSession = false;
 
 /* ================================
-   🔍 DETECT TELEGRAM OR BROWSER
+   TELEGRAM OR BROWSER
 ================================ */
 if (window.Telegram && window.Telegram.WebApp) {
   tg = window.Telegram.WebApp;
-  console.log("✅ Running inside Telegram");
+  console.log("Telegram mode");
 } else {
-  console.log("🌐 Running in browser (test mode)");
+  console.log("Browser test mode");
 
-  // Fake user for browser testing
   tg = {
     initData: "user=" + encodeURIComponent(JSON.stringify({
       id: 11111,
       username: "testuser"
     })),
     initDataUnsafe: {
-      user: {
-        id: 11111,
-        username: "testuser"
-      }
+      user: { id: 11111, username: "testuser" }
     },
-    expand: () => {},
-    onEvent: () => {}
+    expand: () => {}
   };
 }
 
 /* ================================
-   🚀 INIT APP
+   START GAME IMMEDIATELY
 ================================ */
-async function initApp() {
-  try {
-    tg.expand();
+window.addEventListener("load", () => {
+  tg.expand();
 
-    USER = tg.initDataUnsafe.user;
-    console.log("👤 User:", USER);
+  console.log("🚀 Instant game start");
+  init(); // START GAME WITHOUT WAITING
 
-    await startSession();
-
-  } catch (err) {
-    console.error("❌ Init error:", err);
-  }
-}
+  // 🔥 call backend in background (no wait)
+  startSessionBackground();
+});
 
 /* ================================
-   🎮 START SESSION
+   BACKGROUND SESSION CALL
 ================================ */
-async function startSession() {
-  if (isStartingSession) return;
-  isStartingSession = true;
-
+async function startSessionBackground() {
   try {
-    console.log("🚀 Starting session...");
-
     const res = await fetch(
       "https://spaceshooter-backend.onrender.com/api/start-session",
       {
@@ -72,45 +56,12 @@ async function startSession() {
     );
 
     const data = await res.json();
+    console.log("Session (background):", data);
 
-    console.log("🧠 SESSION RESPONSE:", data);
-
-    if (!data.success) {
-      console.warn("⚠️ No plays → allow anyway (dev mode)");
-
-      // 🔥 TEMP FIX → allow game even if backend blocks
-      startGame();
-      return;
-    }
-
-    window.SESSION_TOKEN = data.sessionToken;
-
-    console.log("✅ Session OK:", data.sessionToken);
-
-    startGame();
+    window.SESSION_TOKEN = data.sessionToken || null;
 
   } catch (err) {
-    console.error("❌ Session error:", err);
-
-    // 🔥 fallback → still allow game
-    startGame();
-  } finally {
-    isStartingSession = false;
+    console.log("Backend skipped (demo mode)");
   }
 }
-
-/* ================================
-   🎮 START GAME
-================================ */
-function startGame() {
-  console.log("🎮 Launching game...");
-  init(); // your Phaser init()
-}
-
-/* ================================
-   🚀 LOAD
-================================ */
-window.addEventListener("load", () => {
-  initApp();
-});
 </script>
