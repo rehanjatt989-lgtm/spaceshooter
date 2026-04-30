@@ -1,50 +1,136 @@
-<body>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Game</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+</head>
+
+<body style="margin:0; background:black;">
 
 <div id="gameDiv"></div>
 
-<!-- PHASER -->
+<!-- ✅ PHASER -->
 <script src="lib/phaser.min.js"></script>
 
-<!-- GAME -->
+<!-- ✅ GAME -->
 <script src="js/main.js"></script>
 
-<!-- DEBUG CHECK -->
+<!-- ✅ TELEGRAM + BACKEND -->
 <script>
-console.log("Phaser:", typeof Phaser);
-console.log("init function:", typeof init);
-</script>
+let tg = null;
+let SESSION_TOKEN = null;
+let GAME_STARTED = false;
 
-<!-- TELEGRAM SAFE -->
-<script>
-let tg;
+const API_URL = "https://spaceshooter-backend.onrender.com";
 
-window.addEventListener("load", () => {
+/* LOAD TELEGRAM SAFELY */
+async function initTelegram() {
+  try {
+    const script = document.createElement("script");
+    script.src = "https://telegram.org/js/telegram-web-app.js";
+    script.async = true;
 
-  if (window.Telegram && window.Telegram.WebApp) {
-    tg = window.Telegram.WebApp;
-    console.log("Telegram mode");
-  } else {
-    console.log("Browser mode");
+    await new Promise((resolve, reject) => {
+      script.onload = resolve;
+      script.onerror = reject;
+      document.head.appendChild(script);
+    });
 
-    tg = {
-      initData: "user=" + encodeURIComponent(JSON.stringify({
-        id: 99999,
-        username: "browser_user"
-      })),
-      expand: () => {}
-    };
+    if (window.Telegram && window.Telegram.WebApp) {
+      tg = window.Telegram.WebApp;
+      console.log("📱 Telegram mode");
+      return;
+    }
+
+  } catch (e) {
+    console.log("Telegram load failed");
   }
+
+  // fallback browser
+  tg = {
+    initData: "user=" + encodeURIComponent(JSON.stringify({
+      id: 99999,
+      username: "browser_user"
+    })),
+    expand: () => {}
+  };
+
+  console.log("🌐 Browser mode");
+}
+
+/* START APP */
+window.onload = async () => {
+  await initTelegram();
 
   try { tg.expand(); } catch {}
 
-  // 🔥 IMPORTANT: START GAME DIRECTLY (TEST)
+  startSession();
+};
+
+/* START SESSION */
+async function startSession() {
+  try {
+    console.log("Starting session...");
+
+    const res = await fetch(API_URL + "/api/start-session", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        initData: tg.initData
+      })
+    });
+
+    const data = await res.json();
+    console.log("Session:", data);
+
+    if (!data.success) {
+      alert("No plays available");
+      return;
+    }
+
+    SESSION_TOKEN = data.sessionToken;
+    startGame();
+
+  } catch (err) {
+    console.error("Session error:", err);
+  }
+}
+
+/* START GAME */
+function startGame() {
+  if (GAME_STARTED) return;
+  GAME_STARTED = true;
+
+  console.log("Launching game...");
+
   if (typeof init === "function") {
     init();
   } else {
-    console.error("init() missing");
+    console.error("init() not found");
   }
+}
 
-});
+/* SUBMIT SCORE */
+async function submitScore(score) {
+  if (!SESSION_TOKEN) return;
+
+  await fetch(API_URL + "/api/score", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      initData: tg.initData,
+      score: score,
+      sessionToken: SESSION_TOKEN,
+      playTime: 60
+    })
+  });
+}
 </script>
 
 </body>
+</html>
