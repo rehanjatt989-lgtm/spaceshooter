@@ -1,3 +1,20 @@
+<body>
+
+<div id="gameDiv"></div>
+
+<!-- ===============================
+   PHASER (GAME ENGINE)
+=============================== -->
+<script src="js/phaser.min.js"></script>
+
+<!-- ===============================
+   YOUR GAME CODE (HAS init())
+=============================== -->
+<script src="js/main.js"></script>
+
+<!-- ===============================
+   TELEGRAM + BACKEND LOGIC (FINAL)
+=============================== -->
 <script>
 let tg;
 let SESSION_TOKEN = null;
@@ -29,7 +46,7 @@ function loadTelegramScript() {
 }
 
 /* ===============================
-   START APP (SAFE INIT)
+   START APP
 =============================== */
 window.addEventListener("load", async () => {
   const telegramLoaded = await loadTelegramScript();
@@ -40,7 +57,6 @@ window.addEventListener("load", async () => {
   } else {
     console.log("🌐 Browser mode");
 
-    // fallback user for browser
     tg = {
       initData: "user=" + encodeURIComponent(JSON.stringify({
         id: 99999,
@@ -55,15 +71,13 @@ window.addEventListener("load", async () => {
 
   try {
     if (tg.expand) tg.expand();
-  } catch (e) {
-    console.log("Expand skipped");
-  }
+  } catch {}
 
   startSession();
 });
 
 /* ===============================
-   START SESSION (REQUIRED)
+   START SESSION
 =============================== */
 async function startSession() {
   try {
@@ -83,17 +97,15 @@ async function startSession() {
     console.log("Session response:", data);
 
     if (!data.success || !data.sessionToken) {
-      alert("No plays available. Please purchase or try later.");
+      alert("No plays available");
       return;
     }
 
     SESSION_TOKEN = data.sessionToken;
-
     startGame();
 
   } catch (err) {
     console.error("❌ Session error:", err);
-    alert("Server error. Try again.");
   }
 }
 
@@ -105,11 +117,11 @@ function startGame() {
   GAME_STARTED = true;
 
   console.log("🎮 Launching game...");
-  
+
   if (typeof init === "function") {
-    init(); // Phaser start
+    init();
   } else {
-    console.error("❌ init() not found — Phaser not loaded");
+    console.error("❌ init() not found");
   }
 }
 
@@ -141,3 +153,5 @@ async function submitScore(score) {
   }
 }
 </script>
+
+</body>
