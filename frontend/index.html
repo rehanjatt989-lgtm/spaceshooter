@@ -2,61 +2,29 @@
 
 <div id="gameDiv"></div>
 
-<!-- ===============================
-   PHASER (FIXED PATH ✅)
-=============================== -->
+<!-- PHASER -->
 <script src="lib/phaser.min.js"></script>
 
-<!-- ===============================
-   YOUR GAME FILE
-=============================== -->
+<!-- GAME -->
 <script src="js/main.js"></script>
 
-<!-- ===============================
-   TELEGRAM + BACKEND (FINAL)
-=============================== -->
+<!-- DEBUG CHECK -->
+<script>
+console.log("Phaser:", typeof Phaser);
+console.log("init function:", typeof init);
+</script>
+
+<!-- TELEGRAM SAFE -->
 <script>
 let tg;
-let SESSION_TOKEN = null;
-let GAME_STARTED = false;
 
-const API_URL = "https://spaceshooter-backend.onrender.com";
+window.addEventListener("load", () => {
 
-/* ===============================
-   LOAD TELEGRAM SAFELY
-=============================== */
-function loadTelegramScript() {
-  return new Promise((resolve) => {
-    const script = document.createElement("script");
-    script.src = "https://telegram.org/js/telegram-web-app.js";
-    script.async = true;
-
-    script.onload = () => {
-      console.log("✅ Telegram loaded");
-      resolve(true);
-    };
-
-    script.onerror = () => {
-      console.log("⚠ Telegram failed → browser mode");
-      resolve(false);
-    };
-
-    document.head.appendChild(script);
-  });
-}
-
-/* ===============================
-   START APP
-=============================== */
-window.addEventListener("load", async () => {
-
-  const telegramLoaded = await loadTelegramScript();
-
-  if (telegramLoaded && window.Telegram && window.Telegram.WebApp) {
+  if (window.Telegram && window.Telegram.WebApp) {
     tg = window.Telegram.WebApp;
-    console.log("📱 Telegram mode");
+    console.log("Telegram mode");
   } else {
-    console.log("🌐 Browser mode");
+    console.log("Browser mode");
 
     tg = {
       initData: "user=" + encodeURIComponent(JSON.stringify({
@@ -67,92 +35,16 @@ window.addEventListener("load", async () => {
     };
   }
 
-  try {
-    if (tg.expand) tg.expand();
-  } catch (e) {}
+  try { tg.expand(); } catch {}
 
-  startSession();
-});
-
-/* ===============================
-   START SESSION
-=============================== */
-async function startSession() {
-  try {
-    console.log("🚀 Starting session...");
-
-    const res = await fetch(API_URL + "/api/start-session", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        initData: tg.initData
-      })
-    });
-
-    const data = await res.json();
-    console.log("Session:", data);
-
-    if (!data.success || !data.sessionToken) {
-      alert("No plays available");
-      return;
-    }
-
-    SESSION_TOKEN = data.sessionToken;
-
-    startGame();
-
-  } catch (err) {
-    console.error("❌ Session error:", err);
-    alert("Server error");
-  }
-}
-
-/* ===============================
-   START GAME
-=============================== */
-function startGame() {
-  if (GAME_STARTED) return;
-
-  GAME_STARTED = true;
-
-  console.log("🎮 Starting game...");
-
+  // 🔥 IMPORTANT: START GAME DIRECTLY (TEST)
   if (typeof init === "function") {
     init();
   } else {
-    console.error("❌ init() not found → check main.js");
+    console.error("init() missing");
   }
-}
 
-/* ===============================
-   SUBMIT SCORE
-=============================== */
-async function submitScore(score) {
-  if (!SESSION_TOKEN) return;
-
-  try {
-    const res = await fetch(API_URL + "/api/score", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        initData: tg.initData,
-        score: score,
-        sessionToken: SESSION_TOKEN,
-        playTime: 60
-      })
-    });
-
-    const data = await res.json();
-    console.log("🏆 Score:", data);
-
-  } catch (err) {
-    console.error("❌ Score error:", err);
-  }
-}
+});
 </script>
 
 </body>
