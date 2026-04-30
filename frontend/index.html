@@ -8,15 +8,14 @@ let GAME_STARTED = false;
 const API_URL = "https://spaceshooter-backend.onrender.com";
 
 /* ===============================
-   TELEGRAM OR BROWSER
+   TELEGRAM OR BROWSER (SAFE)
 =============================== */
 if (window.Telegram && window.Telegram.WebApp) {
   tg = window.Telegram.WebApp;
   console.log("Telegram mode");
 } else {
-  console.log("Browser mode");
+  console.log("Browser fallback mode");
 
-  // fallback user (ONLY for browser testing)
   tg = {
     initData: "user=" + encodeURIComponent(JSON.stringify({
       id: 99999,
@@ -43,8 +42,9 @@ window.addEventListener("load", () => {
 
   startSession();
 });
+
 /* ===============================
-   START SESSION (REQUIRED)
+   START SESSION (NON-BLOCKING)
 =============================== */
 async function startSession() {
   try {
@@ -63,19 +63,18 @@ async function startSession() {
     const data = await res.json();
     console.log("Session response:", data);
 
-    if (!data.success || !data.sessionToken) {
-      alert("No plays available. Please purchase or try later.");
-      return;
+    if (data.success && data.sessionToken) {
+      SESSION_TOKEN = data.sessionToken;
+    } else {
+      console.warn("No session available, starting anyway");
     }
-
-    SESSION_TOKEN = data.sessionToken;
-
-    startGame();
 
   } catch (err) {
     console.error("Session error:", err);
-    alert("Server error. Try again.");
   }
+
+  // ✅ ALWAYS START GAME (IMPORTANT FIX)
+  startGame();
 }
 
 /* ===============================
@@ -93,10 +92,13 @@ function startGame() {
    SUBMIT SCORE
 =============================== */
 async function submitScore(score) {
-  if (!SESSION_TOKEN) return;
+  if (!SESSION_TOKEN) {
+    console.warn("No session token, skipping score submit");
+    return;
+  }
 
   try {
-    const playTime = 60; // or your actual time
+    const playTime = 60;
 
     const res = await fetch(API_URL + "/api/score", {
       method: "POST",
